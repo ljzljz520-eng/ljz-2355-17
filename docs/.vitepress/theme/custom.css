@@ -1,0 +1,25 @@
+:root {
+  --vp-c-brand: #409eff;
+  --vp-c-brand-light: #53a8ff;
+  --vp-c-brand-lighter: #66b1ff;
+  --vp-c-brand-dark: #337ecc;
+  --vp-c-brand-darker: #286099;
+
+  /* Demo related variables */
+  --vp-demo-border: var(--vp-c-gutter);
+  --vp-demo-bg: var(--vp-c-bg);
+  --vp-demo-footer-bg: var(--vp-c-bg-soft);
+}
+
+.vp-doc h1 {
+  margin: 48px 0 16px;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Base components styles */
+.demo-button {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
