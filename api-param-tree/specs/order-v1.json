@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0",
+  "info": {
+    "title": "下单 API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {
+      "OrderCreate": {
+        "type": "object",
+        "description": "创建订单请求体",
+        "required": [
+          "items",
+          "payType"
+        ],
+        "properties": {
+          "payType": {
+            "type": "string",
+            "enum": [
+              "card",
+              "invoice",
+              "cod"
+            ],
+            "description": "支付方式，决定下面哪些字段必填"
+          },
+          "cardNo": {
+            "type": "string",
+            "description": "银行卡号：payType=card 时必填",
+            "deprecated": true
+          },
+          "invoiceTitle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "发票抬头：payType=invoice 时条件必填；可显式传 null"
+          },
+          "contact": {
+            "type": "string",
+            "description": "联系人：cod（货到付款）时条件必填；v2 起变为全局必填"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          },
+          "couponCode": {
+            "type": "string",
+            "description": "优惠券码，缺省为 null 语义由后端补默认（默认值 / 缺省 / null 三态演示）",
+            "nullable": true,
+            "default": "NO_COUPON"
+          },
+          "remark": {
+            "type": "string",
+            "description": "已废弃字段，页面应灰显",
+            "deprecated": true
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "payType": {
+                  "const": "card"
+                }
+              },
+              "required": [
+                "payType"
+              ]
+            },
+            "then": {
+              "required": [
+                "cardNo"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "payType": {
+                  "const": "invoice"
+                }
+              },
+              "required": [
+                "payType"
+              ]
+            },
+            "then": {
+              "required": [
+                "invoiceTitle"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "payType": {
+                  "const": "cod"
+                }
+              },
+              "required": [
+                "payType"
+              ]
+            },
+            "then": {
+              "required": [
+                "contact",
+                "address"
+              ]
+            }
+          },
+          {
+            "dependentRequired": {
+              "couponCode": [
+                "contact"
+              ]
+            }
+          }
+        ]
+      },
+      "OrderItem": {
+        "type": "object",
+        "required": [
+          "sku",
+          "qty"
+        ],
+        "properties": {
+          "sku": {
+            "type": "string",
+            "description": "商品 SKU"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "数量，缺省时按默认值 1"
+          },
+          "note": {
+            "type": "string",
+            "description": "行备注（同名 note，路径 items[].note）"
+          },
+          "children": {
+            "type": "array",
+            "description": "子项（合法递归：经过属性+数组元素再引用回自身）",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "description": "地址（树形结构，节点自引用）",
+        "required": [
+          "city"
+        ],
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "城市"
+          },
+          "detail": {
+            "type": "string",
+            "description": "详细地址"
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "邮编，可显式 null"
+          },
+          "parent": {
+            "description": "上级地址（可选属性自引用 —— 合法递归）",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "同名 note，路径 address.note"
+          }
+        }
+      },
+      "PaymentOrder": {
+        "description": "分支组合：oneOf 互斥分支；不同分支必填字段不同",
+        "oneOf": [
+          {
+            "type": "object",
+            "title": "银行卡支付",
+            "required": [
+              "kind",
+              "cardNo"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "card"
+              },
+              "cardNo": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "余额支付",
+            "required": [
+              "kind",
+              "balancePwd"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "balance"
+              },
+              "balancePwd": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "AliasCycle": {
+        "type": "object",
+        "description": "错误演示：纯别名环（A -> B -> A，中间没有属性/数组出口）",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/AliasA"
+          },
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "AliasA": {
+        "$ref": "#/components/schemas/AliasB"
+      },
+      "AliasB": {
+        "$ref": "#/components/schemas/AliasA"
+      }
+    }
+  }
+}

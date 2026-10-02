@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>API 参数树 · 不可变快照文档</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --panel:#fff; --line:#e4e7ed; --text:#303133; --muted:#909399;
+    --brand:#409eff; --brand-d:#337ecc; --ok:#67c23a; --warn:#e6a23c; --err:#f56c6c;
+    --dep:#c0c4cc; --chip:#ecf5ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text)}
+  header{background:#1f2d3d;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header select,header input,header button{font-size:13px}
+  .snap{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0008;
+        padding:3px 8px;border-radius:4px}
+  button{border:1px solid var(--line);background:#fff;border-radius:4px;padding:5px 12px;cursor:pointer}
+  button:hover{border-color:var(--brand);color:var(--brand)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  button.primary:hover{background:var(--brand-d);color:#fff}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  select,input,textarea{border:1px solid var(--line);border-radius:4px;padding:5px 8px;background:#fff}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;padding:14px;align-items:start}
+  @media(max-width:1000px){.layout{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .panel h2{font-size:14px;margin:0;padding:10px 14px;border-bottom:1px solid var(--line);
+            display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .filters{display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafafa;font-weight:600;position:sticky;top:0}
+  tr:hover td{background:#f7fbff}
+  tr.deprecated td{color:var(--dep);text-decoration:line-through}
+  tr.selected td{background:var(--chip)}
+  .tree td:first-child{white-space:nowrap}
+  .caret{display:inline-block;width:16px;color:var(--muted);cursor:pointer;text-align:center}
+  .caret.leaf{cursor:default;visibility:hidden}
+  .indent{color:var(--muted)}
+  .badge{display:inline-block;font-size:11px;line-height:18px;padding:0 7px;border-radius:9px;margin-right:4px}
+  .b-req{background:#fef0f0;color:var(--err)}
+  .b-opt{background:#f4f4f5;color:var(--muted)}
+  .b-cond{background:#fdf6ec;color:var(--warn)}
+  .b-dep{background:#f4f4f5;color:#909399}
+  .b-ref{background:#ecf5ff;color:var(--brand)}
+  .b-err{background:#fef0f0;color:var(--err)}
+  .b-limit{background:#f4f4f5;color:var(--muted)}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .path{color:var(--muted);font-size:11px}
+  .cond{color:var(--warn);font-size:12px}
+  .ctx{color:#9b59b6;font-size:12px}
+  .tri{font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .null{color:var(--err)}
+  .examples .ex{border-bottom:1px solid var(--line);padding:10px 14px}
+  .examples .ex:last-child{border-bottom:0}
+  .st{font-size:11px;padding:1px 8px;border-radius:9px}
+  .st-valid{background:#f0f9eb;color:var(--ok)}
+  .st-invalid{background:#fef0f0;color:var(--err)}
+  .st-needs_revalidation{background:#fdf6ec;color:var(--warn)}
+  .st-unvalidated{background:#f4f4f5;color:var(--muted)}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:10px;font-size:12px;
+      overflow:auto;max-height:260px;margin:6px 0 0;position:relative}
+  .tok{border-radius:3px;padding:0 2px}
+  .hl{background:#facc15;color:#1f2937;border-radius:2px}
+  .field-state{font-size:11px}
+  .basis{color:var(--muted);font-size:11px}
+  .errs{color:var(--err);font-size:12px;margin:4px 0 0;padding-left:18px}
+  .row{display:flex;gap:8px;align-items:center;margin:8px 14px;flex-wrap:wrap}
+  textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .notice{padding:8px 14px;font-size:12px;color:var(--muted)}
+  .hidden{display:none}
+  a{color:var(--brand)}
+</style>
+</head>
+<body>
+<header>
+  <h1>📄 API 参数树</h1>
+  <label>规范
+    <select id="specSel"></select>
+  </label>
+  <label>版本
+    <select id="verSel"></select>
+  </label>
+  <label>根 Schema
+    <select id="rootSel"></select>
+  </label>
+  <span class="snap" id="snapBadge">快照 —</span>
+  <span style="flex:1"></span>
+  <span id="userInfo" class="snap">user: anonymous</span>
+  <button id="shareBtn">🔗 复制分享链接</button>
+  <button id="exportJson">导出 JSON</button>
+  <button id="exportCsv">导出 CSV</button>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="panel">
+      <h2>
+        <span>参数树（必填 / 条件必填 / 可选 / 废弃）</span>
+        <span class="notice" id="modeNote" style="padding:0"></span>
+      </h2>
+      <div class="filters">
+        <label><input type="checkbox" id="fRequired" checked> 必填</label>
+        <label><input type="checkbox" id="fConditional" checked> 条件必填</label>
+        <label><input type="checkbox" id="fOptional" checked> 可选</label>
+        <label><input type="checkbox" id="fDeprecated" checked> 废弃</label>
+        <span style="flex:1"></span>
+        <label>深度 <input id="depthIn" type="number" value="3" min="0" max="8" style="width:56px"></label>
+        <button id="expandAll">全量展开（构建期）</button>
+      </div>
+      <table class="tree">
+        <thead><tr><th style="width:34%">参数</th><th style="width:12%">必填性</th>
+          <th style="width:14%">类型</th><th>默认 / null / 条件</th></tr></thead>
+        <tbody id="treeBody"></tbody>
+      </table>
+      <div class="notice" id="treeMsg"></div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>提交示例（editor）</h2>
+      <div class="row">
+        标题 <input id="exTitle" style="flex:1" placeholder="示例标题">
+        <button class="primary" id="exAdd">按当前快照校验并保存</button>
+      </div>
+      <div class="row"><textarea id="exPayload">{}</textarea></div>
+      <div class="notice" id="exMsg"></div>
+    </div>
+  </div>
+
+  <div class="panel examples">
+    <h2>
+      <span>相关示例 · 样例高亮</span>
+      <button id="revalidateBtn">复验全部</button>
+    </h2>
+    <div class="notice" id="exListMsg">点击左侧参数行，按「参数 → 示例」反向索引筛选。</div>
+    <div id="exList"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---- 全局状态：一切读取都锚定同一个 versionId（同一快照） ----
+const S = {
+  user: new URLSearchParams(location.search).get('u') || 'anonymous',
+  share: new URLSearchParams(location.search).get('share') || null,
+  specs: [], specName: null, versionId: null, version: null,
+  root: '', depth: 3,
+  expanded: new Set(),       // 惰性展开的节点 id（分享的就是它）
+  selectedPath: null,
+  nodesById: new Map(),      // 当前快照下已知节点
+  fullMode: false,
+};
+
+function qs(extra={}){
+  const p = new URLSearchParams(extra);
+  if (S.share) p.set('share', S.share);
+  return '?' + p.toString();
+}
+async function api(path, opts={}){
+  const res = await fetch(path, Object.assign({
+    headers: {'Content-Type':'application/json','X-User-Id':S.user},
+  }, opts));
+  const body = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(body.error || ('HTTP '+res.status));
+  return body;
+}
+const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// ---- 加载流程 ----
+async function loadSpecs(){
+  const data = await api('/api/specs');
+  S.specs = data.specs;
+  const sel = document.getElementById('specSel');
+  sel.innerHTML = S.specs.map(s=>`<option>${esc(s.name)}</option>`).join('');
+  S.specName = S.specs[0]?.name;
+  if(S.specName) sel.value = S.specName;
+}
+function currentSpec(){ return S.specs.find(s=>s.name===S.specName); }
+async function selectVersion(vid){
+  S.versionId = Number(vid);
+  // 展开中切换版本：不丢弃展开状态，用新快照重放；失效节点会显示 404 标记
+  S.nodesById.clear(); S.fullMode=false;
+  await loadVersion();
+}
+async function loadVersion(){
+  const v = await api(`/api/versions/${S.versionId}${qs()}`);
+  S.version = v;
+  document.getElementById('snapBadge').textContent =
+    `快照 #${v.id} · ${v.spec_name}@${v.version} · sha256:${v.sha256.slice(0,10)}`;
+  const {roots} = await api(`/api/versions/${S.versionId}/roots${qs()}`);
+  const rs = document.getElementById('rootSel');
+  rs.innerHTML = roots.map(r=>`<option>${esc(r)}</option>`).join('');
+  if(!roots.includes(S.root)) S.root = roots[0] || '';
+  rs.value = S.root;
+  await renderTree();
+  await loadExamples();
+}
+
+// ---- 参数树（惰性：/children?id=…；全量：/tree 后本地挂载） ----
+async function fetchChildren(nodeId){
+  const url = `/api/versions/${S.versionId}/children` +
+    qs({root:S.root, id:nodeId, depth:S.depth});
+  return api(url);
+}
+async function fetchFull(){
+  const url = `/api/versions/${S.versionId}/tree` + qs({root:S.root, depth:S.depth});
+  return api(url);
+}
+function remember(nodes){ for(const n of nodes) S.nodesById.set(n.id, n); }
+
+async function renderTree(){
+  const body = document.getElementById('treeBody');
+  body.innerHTML='';
+  document.getElementById('modeNote').textContent =
+    S.fullMode ? '模式：构建期全量展开' : '模式：按节点惰性展开';
+  try{
+    if(S.fullMode){
+      const {node} = await fetchFull();
+      mountFull(node, 0, body);
+    }else{
+      const {node, children} = await fetchChildren('');
+      remember([node,...children]);
+      body.appendChild(rowFor(node, 0, true, children));
+    }
+    document.getElementById('treeMsg').textContent='';
+  }catch(e){ document.getElementById('treeMsg').textContent = '⚠ '+e.message; }
+}
+
+function filterVisible(n){
+  const r=n.required;
+  if(n.deprecated && !document.getElementById('fDeprecated').checked) return false;
+  if(r==='required' && !document.getElementById('fRequired').checked) return false;
+  if(r==='conditional' && !document.getElementById('fConditional').checked) return false;
+  if(r==='optional' && !document.getElementById('fOptional').checked) return false;
+  return true;
+}
+function badge(n){
+  if(n.kind==='error') return `<span class="badge b-err">引用错误</span>`;
+  if(n.kind==='depth-limit') return `<span class="badge b-limit">深度上限</span>`;
+  if(n.kind==='reference') return `<span class="badge b-ref">↩ 引用 ${esc(n.refName)}</span>`;
+  if(n.deprecated) return `<span class="badge b-dep">废弃</span>`;
+  if(n.required==='required') return `<span class="badge b-req">必填</span>`;
+  if(n.required==='conditional') return `<span class="badge b-cond">条件必填</span>`;
+  return `<span class="badge b-opt">可选</span>`;
+}
+function triState(n){
+  const parts=[];
+  if(n.default && n.default.present)
+    parts.push(`<span class="tri">默认=<span class="hl">${esc(JSON.stringify(n.default.value))}</span></span>`);
+  else
+    parts.push(`<span class="tri" title="未声明 default">缺省（无默认）</span>`);
+  if(n.nullable) parts.push(`<span class="tri null">允许 null</span>`);
+  for(const c of (n.conditions||[]))
+    parts.push(`<div class="cond">ⓘ ${esc(c.text)}</div>`);
+  for(const c of (n.context||[]))
+    parts.push(`<div class="ctx">⤷ 分支上下文：${esc(c.text)}</div>`);
+  if(n.kind==='error') parts.push(`<div class="cond">${esc(n.message)}</div>`);
+  if(n.kind==='reference') parts.push(`<div class="path">链：${(n.chain||[]).map(esc).join(' → ')}</div>`);
+  return parts.join(' ');
+}
+
+function rowFor(n, depth, isOpen, children){
+  const tr=document.createElement('tr');
+  if(n.deprecated) tr.classList.add('deprecated');
+  if(S.selectedPath && n.path===S.selectedPath) tr.classList.add('selected');
+  if(!filterVisible(n)) tr.classList.add('hidden');
+  tr.dataset.path = n.path || '';
+  const hasCh = n.hasChildren || (children&&children.length);
+  const caret = `<span class="caret ${hasCh?'':'leaf'}">${hasCh?(isOpen?'▾':'▸'):''}</span>`;
+  const indent = `<span class="indent">${'　'.repeat(depth)}</span>`;
+  tr.innerHTML = `
+    <td>${caret}${indent}<span data-name>${esc(n.name)}</span>
+        <div class="path mono">${esc(n.path||'(root)')} ${n.kind==='reference'?'':''}</div></td>
+    <td>${badge(n)}${n.branch?`<div class="path">${esc(n.branch.kind)}#${n.branch.index+1}</div>`:''}</td>
+    <td class="mono">${esc(n.type||'')}</td>
+    <td>${triState(n)}</td>`;
+  tr.querySelector('td:first-child').style.cursor='pointer';
+  tr.addEventListener('click',(ev)=>{
+    if(ev.target.closest('.caret')) return;
+    S.selectedPath = n.path || null;
+    document.querySelectorAll('#treeBody tr').forEach(x=>x.classList.remove('selected'));
+    if(n.path) tr.classList.add('selected');
+    loadExamples();
+  });
+  const caretEl=tr.querySelector('.caret');
+  if(hasCh) caretEl.addEventListener('click',async(ev)=>{
+    ev.stopPropagation();
+    if(S.fullMode) return; // 全量已全部挂载，交给原生折叠
+    const open = S.expanded.has(n.id);
+    if(open){
+      // 折叠：移除直接挂载的后续行（同前缀、深度+1）
+      collapseRows(tr, depth);
+      S.expanded.delete(n.id);
+      caretEl.textContent='▸';
+    }else{
+      let kids;
+      if(children){ kids=children; children=null; }
+      else { const r=await fetchChildren(n.id); kids=r.children; remember(kids); }
+      let anchor=tr;
+      for(const c of kids){
+        const cr = await attachedLazyRow(c, depth+1);
+        anchor.after(cr); anchor=cr;
+      }
+      S.expanded.add(n.id);
+      caretEl.textContent='▾';
+      applyFilters();
+    }
+  });
+  return tr;
+}
+function collapseRows(tr, depth){
+  // 简化折叠：移除之后所有缩进更深的行，直到遇到同级或更浅
+  let next=tr.nextElementSibling;
+  while(next && rowDepth(next)>depth){ const x=next.nextElementSibling; next.remove(); next=x; }
+}
+function rowDepth(tr){ return tr.dataset.depth|0; }
+async function attachedLazyRow(n, depth){
+  const isOpen = S.expanded.has(n.id);
+  let children=null;
+  const tr=rowFor(n, depth, isOpen, null); tr.dataset.depth=depth;
+  if(isOpen && n.hasChildren){
+    const r=await fetchChildren(n.id); children=r.children; remember(children);
+    // 递归补挂
+    const frag=document.createDocumentFragment();
+    for(const c of children) frag.appendChild(await attachedLazyRow(c, depth+1));
+    tr._after=frag;
+  }
+  return tr;
+}
+
+function mountFull(n, depth, tbody){
+  const isOpen = depth < S.depth || n.kind==='reference';
+  const tr=document.createElement('tr'); tr.dataset.depth=depth;
+  if(n.deprecated) tr.classList.add('deprecated');
+  if(!filterVisible(n)) tr.classList.add('hidden');
+  if(S.selectedPath && n.path===S.selectedPath) tr.classList.add('selected');
+  const ch=n.children||[];
+  tr.innerHTML=`<td><span class="caret ${ch.length?'':'leaf'}">${ch.length?'▾':''}</span>
+      <span class="indent">${'　'.repeat(depth)}</span>${esc(n.name)}
+      <div class="path mono">${esc(n.path||'(root)')}</div></td>
+    <td>${badge(n)}</td><td class="mono">${esc(n.type||'')}</td><td>${triState(n)}</td>`;
+  tr.addEventListener('click',()=>{ S.selectedPath=n.path||null;
+    document.querySelectorAll('#treeBody tr').forEach(x=>x.classList.remove('selected'));
+    if(n.path)tr.classList.add('selected'); loadExamples(); });
+  const caret=tr.querySelector('.caret');
+  tbody.appendChild(tr);
+  if(ch.length){
+    for(const c of ch) mountFull(c, depth+1, tbody);
+    caret.addEventListener('click',()=>{
+      const show=caret.textContent==='▸';
+      caret.textContent=show?'▾':'▸';
+      // 只折叠/展开直接子行；更深的行交给各自的 caret 管理
+      let nx=tr.nextElementSibling;
+      while(nx && (nx.dataset.depth|0)>=depth+1){
+        if((nx.dataset.depth|0)===depth+1) nx.classList.toggle('hidden',!show);
+        nx=nx.nextElementSibling;
+      }
+    });
+  }
+}
+function applyFilters(){
+  document.querySelectorAll('#treeBody tr').forEach(tr=>{
+    const nid = tr.querySelector('[data-name]');
+    // 简化：根据 class 已在生成时决定；切换过滤直接重建惰性视图
+  });
+  // 统一重建，保证过滤与惰性展开一致
+  renderTree();
+}
+
+// ---- 示例：反向索引 + 三态高亮 ----
+async function loadExamples(){
+  const box=document.getElementById('exList'); box.innerHTML='';
+  const msg=document.getElementById('exListMsg');
+  try{
+    const p = {root:S.root};
+    if(S.selectedPath) p.path=S.selectedPath;
+    const {examples}=await api(`/api/versions/${S.versionId}/examples${qs(p)}`);
+    msg.textContent = S.selectedPath
+      ? `路径 ${S.root}:${S.selectedPath} 及其子树命中 ${examples.length} 个示例（同一快照）`
+      : `当前规范共 ${examples.length} 个示例`;
+    for(const e of examples) box.appendChild(exampleEl(e));
+  }catch(err){ msg.textContent='⚠ '+err.message; }
+}
+function highlightJson(payload, states){
+  // 以根字段三态标注键；嵌套值做简单 JSON 高亮，命中路径加 .hl
+  let txt=JSON.stringify(payload,null,2);
+  txt=esc(txt);
+  for(const st of states||[]){
+    if(st.state==='null'){
+      const re=new RegExp('("'+st.name+'":\\s*)null');
+      txt=txt.replace(re,'$1<span class="tok null">null</span>');
+    }
+  }
+  return txt;
+}
+function exampleEl(e){
+  const div=document.createElement('div'); div.className='ex';
+  const stale = e.status==='needs_revalidation';
+  const basisNote = (e.basis_version_id && e.basis_version_id!==S.versionId)
+    ? `<span class="basis">（结论依据快照 #${e.basis_version_id}，未声明适配当前 #${S.versionId}）</span>`
+    : stale ? '<span class="basis">（等待按当前快照复验）</span>'
+            : `<span class="basis">（已按快照 #${S.versionId} 复验）</span>`;
+  const stateChips=(e.field_states||[]).map(st=>{
+    const cls={value:'',null:'null',absent_default:'',absent:''}[st.state]||'';
+    const label={value:'有值',null:'显式null',absent_default:'缺省→默认',absent:'缺省'}[st.state];
+    return `<span class="field-state" title="${st.name}">${esc(st.name)}:<b class="${cls}">${label}</b>${st.required?'*':''}</span>`;
+  }).join('　');
+  div.innerHTML=`
+    <div><b>${esc(e.title)}</b>
+      <span class="st st-${e.status}">${
+        {valid:'✓ 合法',invalid:'✗ 非法',needs_revalidation:'⟳ 待复验',unvalidated:'未校验'}[e.status]||e.status}</span>
+      ${basisNote}</div>
+    <div class="basis" style="margin:3px 0">${stateChips}</div>
+    <pre>${highlightJson(e.payload,e.field_states)}</pre>
+    ${e.errors.length?`<ul class="errs">${e.errors.map(x=>`<li><span class="mono">${esc(x.code)}</span> ${esc(x.path)} — ${esc(x.message)}</li>`).join('')}</ul>`:''}`;
+  return div;
+}
+
+// ---- 事件绑定 ----
+document.getElementById('specSel').addEventListener('change',async e=>{
+  S.specName=e.target.value; fillVersions();
+});
+function fillVersions(){
+  const s=currentSpec();
+  const sel=document.getElementById('verSel');
+  sel.innerHTML=(s?.versions||[]).map(v=>`<option value="${v.id}">${esc(v.version)} (#${v.id})</option>`).reverse().join('');
+  if(s?.versions.length){ selectVersion(sel.value); }
+}
+document.getElementById('verSel').addEventListener('change',e=>selectVersion(e.target.value));
+document.getElementById('rootSel').addEventListener('change',async e=>{
+  S.root=e.target.value; S.expanded.clear(); await renderTree(); await loadExamples();
+});
+document.getElementById('depthIn').addEventListener('change',async e=>{
+  S.depth=Number(e.target.value); S.expanded.clear(); await renderTree();
+});
+['fRequired','fConditional','fOptional','fDeprecated'].forEach(id=>
+  document.getElementById(id).addEventListener('change',()=>{ S.fullMode?applyFilters():applyFilters(); }));
+document.getElementById('expandAll').addEventListener('click',async()=>{
+  S.fullMode=!S.fullMode;
+  document.getElementById('expandAll').textContent = S.fullMode?'切回惰性展开':'全量展开（构建期）';
+  await renderTree();
+});
+document.getElementById('shareBtn').addEventListener('click',async()=>{
+  const {token,url}=await api('/api/share',{method:'POST',
+    body:JSON.stringify({vid:S.versionId, root:S.root, expanded:[...S.expanded],
+                         full:S.fullMode, depth:S.depth})});
+  const full=location.origin+url+'&u='+encodeURIComponent(S.user);
+  try{ await navigator.clipboard.writeText(full); }catch(_){}
+  prompt('分享链接（只授权当前不可变版本，打开后恢复展开状态）：', full);
+});
+document.getElementById('exportJson').addEventListener('click',()=>{
+  location.href=`/api/versions/${S.versionId}/export${qs({root:S.root,fmt:'json'})}`;
+});
+document.getElementById('exportCsv').addEventListener('click',()=>{
+  location.href=`/api/versions/${S.versionId}/export${qs({root:S.root,fmt:'csv'})}`;
+});
+document.getElementById('exAdd').addEventListener('click',async()=>{
+  const msg=document.getElementById('exMsg');
+  let payload; try{ payload=JSON.parse(document.getElementById('exPayload').value); }
+  catch(e){ msg.textContent='⚠ JSON 解析失败：'+e.message; return; }
+  try{
+    const r=await api(`/api/versions/${S.versionId}/examples`,{method:'POST',
+      body:JSON.stringify({root:S.root,title:document.getElementById('exTitle').value,payload})});
+    msg.innerHTML = r.valid?'✓ 已按当前快照校验通过并入库':
+      `✗ 校验发现 ${r.errors.length} 个问题（仍已入库为 invalid）`;
+    await loadExamples();
+  }catch(e){ msg.textContent='⚠ '+e.message; }
+});
+document.getElementById('revalidateBtn').addEventListener('click',async()=>{
+  try{ const r=await api(`/api/versions/${S.versionId}/revalidate`,{method:'POST',body:'{}'});
+    document.getElementById('exListMsg').textContent=
+      `复验完成：共 ${r.revalidated}，合法 ${r.valid}，非法 ${r.invalid}`;
+    await loadExamples();
+  }catch(e){ document.getElementById('exListMsg').textContent='⚠ '+e.message; }
+});
+
+// ---- 分享进入：恢复 vid 与展开状态 ----
+async function bootstrap(){
+  document.getElementById('userInfo').textContent='user: '+S.user;
+  await loadSpecs();
+  if(S.share){
+    try{
+      const p=await api('/api/share/'+encodeURIComponent(S.share));
+      S.specName = S.specs.find(s=>s.versions.some(v=>v.id===p.vid))?.name || S.specName;
+      document.getElementById('specSel').value=S.specName;
+      fillVersions();
+      document.getElementById('verSel').value=String(p.vid);
+      await selectVersion(p.vid);
+      S.root=p.root||S.root; document.getElementById('rootSel').value=S.root;
+      S.depth=p.depth||3; document.getElementById('depthIn').value=S.depth;
+      if(p.full){ S.fullMode=true; document.getElementById('expandAll').textContent='切回惰性展开'; }
+      (p.expanded||[]).forEach(id=>S.expanded.add(id));
+      await renderTree();
+      if(S.selectedPath===null) await loadExamples();
+      return;
+    }catch(e){ alert('分享链接无效：'+e.message); }
+  }
+  fillVersions();
+}
+bootstrap();
+</script>
+</body>
+</html>
