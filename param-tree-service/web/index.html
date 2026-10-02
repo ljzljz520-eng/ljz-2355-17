@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>API 参数树</title>
+<style>
+  :root {
+    --bg:#f7f9fc; --panel:#fff; --line:#e4e8ef; --ink:#1f2733; --muted:#6b7686;
+    --blue:#2563eb; --green:#15803d; --amber:#b45309; --red:#b91c1c; --redbg:#fef2f2;
+    --chip:#eef2ff; --shadow:0 1px 3px rgba(20,30,50,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--ink)}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--panel);
+         border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  header h1{font-size:16px;margin:0}
+  header .snap{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+  header select,header button,header input{padding:5px 10px;border:1px solid var(--line);
+         border-radius:6px;background:#fff;font-size:13px}
+  header button{cursor:pointer}
+  header button.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  main{display:grid;grid-template-columns:minmax(380px,1.2fr) 1fr;gap:14px;padding:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         box-shadow:var(--shadow);overflow:hidden}
+  .panel h2{font-size:13px;margin:0;padding:10px 14px;border-bottom:1px solid var(--line);
+            color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .groups{max-height:74vh;overflow:auto}
+  .group-title{padding:8px 14px 4px;font-size:12px;font-weight:700;letter-spacing:.04em}
+  .group-title.required{color:var(--red)}
+  .group-title.conditional{color:var(--amber)}
+  .group-title.optional{color:var(--muted)}
+  .group-title.deprecated{color:#8a6d1d}
+  .row{display:flex;align-items:flex-start;gap:6px;padding:4px 14px 4px 8px;cursor:pointer}
+  .row:hover{background:#f3f7ff}
+  .row.selected{background:#e8f0ff}
+  .caret{width:14px;flex:0 0 14px;color:var(--muted);text-align:center;user-select:none}
+  .name{font-weight:600}
+  .type{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .badges{display:flex;gap:4px;flex-wrap:wrap;margin-left:6px}
+  .badge{font-size:11px;padding:0 6px;border-radius:10px;background:var(--chip);color:#374151}
+  .badge.req{background:var(--redbg);color:var(--red)}
+  .badge.cond{background:#fffbeb;color:var(--amber)}
+  .badge.dep{background:#fefce8;color:#854d0e}
+  .badge.rec{background:#ecfdf5;color:var(--green)}
+  .badge.err{background:var(--redbg);color:var(--red)}
+  .badge.lock{background:#f3f4f6;color:#6b7280}
+  .preds{margin:2px 0 4px 26px;font-size:12px;color:var(--amber)}
+  .children{margin-left:14px;border-left:1px dashed var(--line);padding-left:4px}
+  .desc{color:var(--muted);font-size:12px;margin:1px 0 0 22px}
+  pre{margin:0;padding:12px 14px;font:12px/1.7 ui-monospace,Menlo,monospace;
+      white-space:pre-wrap;word-break:break-word;max-height:46vh;overflow:auto}
+  .examples{padding:8px 14px;display:flex;flex-direction:column;gap:6px}
+  .examples label{font-size:12px;color:var(--muted)}
+  .pill{font-size:11px;padding:1px 8px;border-radius:10px;font-weight:600}
+  .pill.passed{background:#dcfce7;color:var(--green)}
+  .pill.failed{background:var(--redbg);color:var(--red)}
+  .pill.pending,.pill.stale{background:#fef3c7;color:var(--amber)}
+  .legend{padding:8px 14px;font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  .s-present{background:#dcfce7} .s-null{background:#fde68a}
+  .s-defaulted{background:#dbeafe} .s-absent{background:#f3f4f6}
+  .s-missing{background:#fecaca;outline:1px solid var(--red)}
+  .s-invalid{background:#fca5a5}
+  .json-row{display:block}
+  .json-key{color:#7c3aed}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+         background:#111827;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;
+         display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>API 参数树</h1>
+  <label>API <input id="api" value="users" style="width:90px" /></label>
+  <label>版本 <select id="version"></select></label>
+  <label>主体 <input id="principal" value="alice" style="width:110px" /></label>
+  <button class="primary" onclick="App.open()">打开/新建会话</button>
+  <button onclick="App.share()">分享展开态</button>
+  <button onclick="App.exportBundle()">导出</button>
+  <span class="snap" id="snap"></span>
+</header>
+<main>
+  <section class="panel">
+    <h2><span>参数树（必填 / 条件必填 / 可选 / 废弃）</span><span id="switchInfo"></span></h2>
+    <div class="legend">
+      <span><i class="swatch s-missing"></i>缺失必填</span>
+      <span><i class="swatch s-null"></i>显式 null</span>
+      <span><i class="swatch s-defaulted"></i>缺省→默认</span>
+      <span><i class="swatch s-absent"></i>缺省（无默认）</span>
+    </div>
+    <div class="groups" id="tree"></div>
+  </section>
+  <section class="panel">
+    <h2>示例 · 逐路径高亮（同一会话快照）</h2>
+    <div class="examples">
+      <label>选择示例
+        <select id="exampleSel" onchange="App.highlight()"></select>
+        <span id="exState"></span>
+      </label>
+    </div>
+    <pre id="json"></pre>
+    <div class="examples">
+      <button onclick="App.revalidate()" style="padding:6px">对当前快照复验该示例</button>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>
